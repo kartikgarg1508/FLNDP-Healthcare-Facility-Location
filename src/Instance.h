@@ -3,6 +3,7 @@
 #include <iosfwd>
 #include <vector>
 #include <tuple>
+#include <string>
 using namespace std;
 
 class Instance {
@@ -13,12 +14,12 @@ public:
 
    int numNodes() const;
    int numTypesOfHF() const;
-   int numTypesOfLinks() const;
+   int numTypesOfLink() const;
    int numTimePeriods() const;
    long long LargeConstant() const;
 
    int existingFacilities(int node) const;
-   bool existingLink(int fromNode, int toNode) const;
+   int existingLink(int fromNode, int toNode) const;
 
    int demandRate(int node, int timePeriod) const;
    long long fixedCostHF(int node, int typeHF, int timePeriod) const;
@@ -47,10 +48,11 @@ protected:
     * Resize data structures to acommodate all instance parameters.
     */
    void resize();
-   void resize(int numNodes, int numTypesOfHF, int numTypesOfLinks, int numTimePeriods);
+   void resize(int numNodes, int numTypesOfHF, int numTypesOfLinks, int numTimePeriods, long long LargeConstant);
 
 private:
-   std::string m_fname;
+
+   string m_fname;
    int m_numNodes;
    int m_numTypesOfHF;
    int m_numTypesOfLink;
@@ -58,7 +60,7 @@ private:
    long long m_LargeConstant;
 
    vector<int> m_existingFacilities;
-   vector<vector<bool>> m_existingLink;
+   vector<vector<int>> m_existingLink;
    vector<vector<int>> m_demandRate;
    vector<vector<vector<long long>>> m_fixedCostHF;
    vector<vector<vector<vector<long long>>>> m_fixedCostLink;
@@ -71,7 +73,7 @@ private:
    vector<vector<vector<int>>> m_linkCapacity;
    vector<long long> m_FacilityConstBudget;
    vector<long long> m_LinkConstBudget;
-   vector<int> m_population;
+   vector<vector<int>> m_population;
    vector<vector<int>> m_minimumPopulationForOpeningHF;
    vector<vector<int>> m_minimumServingCapacityHF;
    vector<vector<int>> m_maximumServingCapacityHF;
