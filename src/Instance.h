@@ -16,10 +16,9 @@ public:
    int numTypesOfHF() const;
    int numTypesOfLink() const;
    int numTimePeriods() const;
-   long long LargeConstant() const;
 
-   int existingFacilities(int node) const;
-   int existingLink(int fromNode, int toNode) const;
+   int existingFacilities(int node, int typeHF) const;
+   int existingLink(int fromNode, int toNode, int typeLink) const;
 
    int demandRate(int node, int timePeriod) const;
    long long fixedCostHF(int node, int typeHF, int timePeriod) const;
@@ -48,7 +47,7 @@ protected:
     * Resize data structures to acommodate all instance parameters.
     */
    void resize();
-   void resize(int numNodes, int numTypesOfHF, int numTypesOfLinks, int numTimePeriods, long long LargeConstant);
+   void resize(int numNodes, int numTypesOfHF, int numTypesOfLinks, int numTimePeriods);
 
 private:
 
@@ -57,10 +56,9 @@ private:
    int m_numTypesOfHF;
    int m_numTypesOfLink;
    int m_numTimePeriods;
-   long long m_LargeConstant;
 
-   vector<int> m_existingFacilities;
-   vector<vector<int>> m_existingLink;
+   vector<vector<int>> m_existingFacilities;
+   vector<vector<vector<int>>> m_existingLink;
    vector<vector<int>> m_demandRate;
    vector<vector<vector<long long>>> m_fixedCostHF;
    vector<vector<vector<vector<long long>>>> m_fixedCostLink;

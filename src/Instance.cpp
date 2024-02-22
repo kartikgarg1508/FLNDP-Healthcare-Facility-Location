@@ -33,20 +33,21 @@ Instance::Instance(const char* fname) {
       } else if (buf == "NumberOfTimePeriods") {
          lastenv = buf;
          fid >> m_numTimePeriods;
-      } else if (buf == "LargeConstant") {
-         lastenv = buf;
-         fid >> m_LargeConstant;
          resize();
       } else if (buf == "ExistingNodes") {
          lastenv = buf;
-         for (int i = 0; i < m_numNodes; ++i)
-            fid >> m_existingFacilities[i];
+         for (int i = 0; i < m_numNodes; ++i) {
+            for (int h = 0; h < m_numTypesOfHF; h++)
+               fid >> m_existingFacilities[i][h];
+         }
 
       } else if (buf == "ExistingLinks") {
          lastenv = buf;
          for (int i = 0; i < m_numNodes; i++) {
-            for (int j = 0; j < m_numNodes; j++)
-               fid >> m_existingLink[i][j];
+            for (int j = 0; j < m_numNodes; j++) {
+               for (int r = 0; r < m_numTypesOfLink; r++)
+                  fid >> m_existingLink[i][j][r];
+            }
          }
       } else if (buf == "DemandRate") {
          lastenv = buf;
@@ -195,16 +196,12 @@ int Instance::numTimePeriods() const {
    return m_numTimePeriods;
 }
 
-long long Instance::LargeConstant() const {
-   return m_LargeConstant;
+int Instance::existingFacilities(int node, int typeHF) const {
+   return m_existingFacilities[node][typeHF];
 }
 
-int Instance::existingFacilities(int node) const {
-   return m_existingFacilities[node];
-}
-
-int Instance::existingLink(int fromNode, int toNode) const {
-   return m_existingLink[fromNode][toNode];
+int Instance::existingLink(int fromNode, int toNode, int typeLink) const {
+   return m_existingLink[fromNode][toNode][typeLink];
 }
 
 int Instance::demandRate(int node, int timePeriod) const {
@@ -278,9 +275,9 @@ const std::string & Instance::fileName() const {
 
 void Instance::resize() {
 
-   m_existingFacilities.resize(m_numNodes);
+   m_existingFacilities.resize(m_numNodes, std::vector<int>(m_numTypesOfHF));
 
-   m_existingLink.resize(m_numNodes, std::vector<int>(m_numNodes));
+   m_existingLink.resize(m_numNodes, std::vector<vector<int>>(m_numNodes, std::vector<int>(m_numTypesOfLink)));
 
    m_demandRate.resize(m_numNodes, std::vector<int>(m_numTimePeriods));
 
@@ -315,12 +312,11 @@ void Instance::resize() {
    m_maximumServingCapacityHF.resize(m_numNodes, std::vector<int>(m_numTypesOfHF));
 }
 
-void Instance::resize(int numNodes, int numTypesOfHF, int numTypesOfLink, int numTimePeriods, long long LargeConstant) {
+void Instance::resize(int numNodes, int numTypesOfHF, int numTypesOfLink, int numTimePeriods) {
    m_numNodes = numNodes;
    m_numTypesOfHF = numTypesOfHF;
    m_numTypesOfLink = numTypesOfLink;
    m_numTimePeriods = numTimePeriods;
-   m_LargeConstant = LargeConstant;
 
    resize();
 }
@@ -330,21 +326,26 @@ std::ostream &operator<<(std::ostream &out, const Instance &inst) {
    out << "Number Of Types Of Healthcare Facilities\n" << inst.numTypesOfHF() << "\n";
    out << "Number Of Types Of Links\n" << inst.numTypesOfLink() << "\n";
    out << "Number Of Time Periods\n" << inst.numTimePeriods() << "\n";
-   out << "LargeConstant\n" << inst.LargeConstant() << "\n";
 
    out << "Existing Nodes\n";
    for (int i = 0; i < inst.numNodes(); i++) {
-      out << inst.existingFacilities(i);
-      if (i < inst.numNodes() - 1)
-         out << " ";
+      for (int h = 0; h < inst.numTypesOfHF(); h++) {
+         out << inst.existingFacilities(i, h);
+         if (i < inst.numTypesOfHF() - 1)
+            out << " ";
+      }
+      out << "\n";
    }
 
-   out << "\nExisting Links\n";
+   out << "Existing Links\n";
    for (int i = 0; i < inst.numNodes(); i++) {
       for (int j = 0; j < inst.numNodes(); j++) {
-         out << inst.existingLink(i, j);
-         if (j < inst.numNodes() - 1)
-            out << " ";
+         for (int r = 0; r < inst.numTypesOfLink(); r++) {
+            out << inst.existingLink(i, j, r);
+            if (j < inst.numTypesOfLink() - 1)
+               out << " ";
+         }
+         out << "\n";
       }
       out << "\n";
    }
