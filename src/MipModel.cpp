@@ -15,8 +15,11 @@ MipModel::MipModel(const Instance &inst) : m_inst(inst)
    IloExpr expr(m_env);
    char buf[128] = "";
 
-   double beta = 0.9;
+   double beta = 0.8;
    double bigM = 1e8;
+
+   m_cplex.setParam(IloCplex::Param::Conflict::Display, 2);
+
 
    // Create decision variable z;
    m_z = Var3D(m_env, m_inst.numNodes());
@@ -228,6 +231,7 @@ MipModel::MipModel(const Instance &inst) : m_inst(inst)
       }
    }
 
+
    m_obj3 = IloObjective(m_env, expr, IloObjective::Maximize, "Accessibility");
    m_model.add(m_obj3);
    expr.clear();
@@ -246,7 +250,7 @@ MipModel::MipModel(const Instance &inst) : m_inst(inst)
                for (int r = 0; r < m_inst.numTypesOfLink(); r++)
                {
 
-                  if (i != j and m_q[j][h][t].getImpl() and m_x[i][j][r][t].getImpl())
+                  if (i != j and m_w[i][j][h][r][t].getImpl())
                      expr += (m_w[i][j][h][r][t] * pow((m_inst.distance(i, j) / m_inst.averageSpeed(i, j, r)), -beta)) / m_inst.demandRate(j, t - 1);
                }
             }
@@ -258,12 +262,18 @@ MipModel::MipModel(const Instance &inst) : m_inst(inst)
                expr += (m_q[i][h][t] / m_inst.demandRate(i, t - 1));
          }
 
-         IloConstraint c = m_a[i][t - 1] - expr == 0;
+         IloConstraint c = m_a[i][t - 1] - expr >= 0;
+         c.setName(buf);
+         m_model.add(c);
+
+         c = m_a[i][t - 1] - expr <= 0;
          c.setName(buf);
          m_model.add(c);
          expr.clear();
       }
    }
+
+   cout << "Constraint 7 added successfully" << endl;
 
    // Envy Constraints (8) and (39) and (40)
 
@@ -274,7 +284,7 @@ MipModel::MipModel(const Instance &inst) : m_inst(inst)
          for (int t = 1; t < m_inst.numTimePeriods() + 1; t++)
          {
 
-            if (m_e[i][j][t - 1].getImpl() == nullptr)
+            if (i == j or m_e[i][j][t - 1].getImpl() == nullptr)
                continue;
 
             IloConstraint c = m_e[i][j][t - 1] >= 0;
@@ -651,13 +661,13 @@ MipModel::MipModel(const Instance &inst) : m_inst(inst)
             for (int t = 1; t < m_inst.numTimePeriods() + 1; t++)
             {
 
-               if (m_x[j][i][r][t - 1].getImpl() == nullptr)
+               if (m_x[i][j][r][t - 1].getImpl() == nullptr)
                   continue;
 
                if (m_x[i][j][r][t].getImpl() == nullptr)
                   continue;
 
-               IloConstraint c = m_x[j][i][r][t] >= m_x[i][j][r][t - 1];
+               IloConstraint c = m_x[i][j][r][t] >= m_x[i][j][r][t - 1];
                c.setName(buf);
                m_model.add(c);
                expr.clear();
@@ -681,7 +691,7 @@ MipModel::MipModel(const Instance &inst) : m_inst(inst)
             if (m_z[i][h][t - 1].getImpl() == nullptr)
                continue;
 
-            if (m_inst.population(i, t) >= m_inst.minimumPopulationRequired(i, h))
+            if (m_inst.population(i, t - 1) >= m_inst.minimumPopulationRequired(i, h))
                continue;
 
             IloConstraint c = m_z[i][h][t] >= m_z[i][h][t - 1];
@@ -726,7 +736,7 @@ MipModel::MipModel(const Instance &inst) : m_inst(inst)
                      m_model.add(c);
                      expr.clear();
 
-                     if (m_x[i][j][r][t].getImpl() != nullptr)
+                     if (i < j and m_x[i][j][r][t].getImpl() != nullptr)
                      {
 
                         c = m_w[i][j][h][r][t] <= bigM * m_x[i][j][r][t];
@@ -735,6 +745,19 @@ MipModel::MipModel(const Instance &inst) : m_inst(inst)
                         expr.clear();
 
                         c = m_w[i][j][h][r][t] >= m_q[j][h][t] - (bigM * (1 - m_x[i][j][r][t]));
+                        c.setName(buf);
+                        m_model.add(c);
+                        expr.clear();
+                     }
+                     else if (i > j and m_x[j][i][r][t].getImpl() != nullptr)
+                     {
+
+                        c = m_w[i][j][h][r][t] <= bigM * m_x[j][i][r][t];
+                        c.setName(buf);
+                        m_model.add(c);
+                        expr.clear();
+
+                        c = m_w[i][j][h][r][t] >= m_q[j][h][t] - (bigM * (1 - m_x[j][i][r][t]));
                         c.setName(buf);
                         m_model.add(c);
                         expr.clear();
@@ -755,4 +778,73 @@ MipModel::~MipModel() {
 
 const Instance & MipModel::instance() const {
    return m_inst;
+}
+
+void MipModel::setQuiet(bool toggle) {
+   if (toggle) {
+      m_cplex.setOut(m_env.getNullStream());
+   } else {
+      m_cplex.setOut(m_env.out());
+   }
+}
+
+void MipModel::writeLp(const char *fname) {
+   m_cplex.exportModel(fname);
+}
+
+void MipModel::writeSolution(const char* fname) {
+   m_cplex.writeSolution(fname);
+}
+
+void MipModel::maxThreads(int value) {
+   m_cplex.setParam(IloCplex::IntParam::Threads, value);
+}
+
+void MipModel::timeLimit(int maxSeconds) {
+   m_cplex.setParam(IloCplex::NumParam::TiLim, maxSeconds);
+}
+
+
+double MipModel::solve(const MipModel &mip) {
+   if (!m_cplex.solve()) {
+      cout << "MipModel::solve(): Problem become infeasible." << endl;
+      exit(EXIT_FAILURE);
+   }
+
+   return m_cplex.getObjValue();
+}
+
+double MipModel::objValue() const {
+   return m_cplex.getObjValue();
+}
+
+double MipModel::relativeGap() const {
+   return m_cplex.getMIPRelativeGap();
+}
+
+double MipModel::objLb() const {
+   return m_cplex.getBestObjValue();
+}
+
+std::ostream &operator<<(std::ostream &out, const MipModel &mip) {
+
+   out << "Decision variable z is\n";
+   for (int i = 0; i < mip.m_inst.numNodes(); i++) {
+      for (int h = 0; h < mip.m_inst.numTypesOfHF(); h++) {
+         for (int t = 0; t < mip.m_inst.numTimePeriods() + 1; t++) {
+            out << mip.m_cplex.getValue(mip.m_z[i][h][t]) << "     ";
+         }
+         out << "\n";
+      }
+   }
+
+   for (int i = 0; i < mip.m_inst.numNodes(); i++) {
+      for (int t = 1; t < mip.m_inst.numTimePeriods() + 1; t++) {
+         out << mip.m_cplex.getValue(mip.m_a[i][t - 1]) << "     ";
+      }
+      out << "\n";
+   }
+   out << "Done" << endl;
+
+   return out;
 }

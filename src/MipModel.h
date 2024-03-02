@@ -19,6 +19,20 @@ public:
 
    const Instance &instance() const;
 
+   void setQuiet(bool toggle);
+   void writeLp(const char *fname);
+   void writeSolution(const char *fname);
+
+   void maxThreads(int value);
+   void timeLimit(int maxSeconds);
+
+   double solve(const MipModel &mip);
+   double objValue() const;
+   double relativeGap() const;
+   double objLb() const;
+
+   friend std::ostream &operator<<(std::ostream &out, const MipModel &mip);
+
 protected:
    const Instance &m_inst;
 
@@ -37,4 +51,5 @@ protected:
    Var2D m_a;
    Var3D m_e;
    Var5D m_w;
+
 };
